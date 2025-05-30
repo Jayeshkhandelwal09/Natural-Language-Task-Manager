@@ -24,7 +24,7 @@ const withRetry = async <T>(
 };
 
 const TASK_PARSING_PROMPT = `
-Parse the natural language input into a structured JSON task with the following fields:
+Parse the natural language input into an array of structured JSON tasks. Each task should have the following fields:
 - taskName: A clear, concise title
 - description: Detailed task description
 - priority: One of [P1, P2, P3, P4] where P1 is highest
@@ -38,15 +38,33 @@ For dates:
 - If "next Friday" or similar is mentioned, set to the next occurrence of that day at 11:59 PM
 - If no specific date is mentioned, set dueDate to null
 
-Return the response in valid JSON format.
+Split the input into multiple tasks when:
+- Multiple distinct actions are mentioned
+- Different assignees are specified
+- Different priorities or due dates are mentioned
+- Natural language connectors like "also", "additionally", "next", "lastly" are used
+
+Return the response in valid JSON format as an array of tasks.
 Example format:
 {
-  "taskName": "Example Task",
-  "description": "Detailed description",
-  "priority": "P1",
-  "dueDate": "2024-03-20T23:59:00.000Z",
-  "assignee": "John Doe",
-  "tags": ["important", "meeting"]
+  "tasks": [
+    {
+      "taskName": "Example Task 1",
+      "description": "Detailed description",
+      "priority": "P1",
+      "dueDate": "2024-03-20T23:59:00.000Z",
+      "assignee": "John Doe",
+      "tags": ["important", "meeting"]
+    },
+    {
+      "taskName": "Example Task 2",
+      "description": "Another task description",
+      "priority": "P2",
+      "dueDate": null,
+      "assignee": "Jane Smith",
+      "tags": ["project"]
+    }
+  ]
 }
 `;
 
@@ -105,7 +123,7 @@ export class OpenAIService {
     }
   }
 
-  async parseNaturalLanguage(input: string): Promise<ParsedTask> {
+  async parseNaturalLanguage(input: string): Promise<ParsedTask[]> {
     return withRetry(async () => {
       const completion = await this.openai.chat.completions.create({
         model: "gpt-3.5-turbo-1106",
@@ -116,7 +134,7 @@ export class OpenAIService {
           },
           {
             role: "user",
-            content: `Parse this task into JSON: ${input}`
+            content: `Parse these tasks into JSON: ${input}`
           }
         ],
         temperature: 0.1,
@@ -130,42 +148,51 @@ export class OpenAIService {
       }
 
       try {
-        const parsedTask = JSON.parse(content);
+        const parsedResponse = JSON.parse(content);
         
-        // Validate required fields
-        if (!parsedTask.taskName || !parsedTask.description) {
-          throw new Error('Missing required fields in parsed task');
+        if (!Array.isArray(parsedResponse.tasks)) {
+          throw new Error('Invalid response format: tasks array not found');
         }
 
-        // Handle date parsing
-        if (parsedTask.dueDate) {
-          const dueDate = new Date(parsedTask.dueDate);
-          const now = new Date();
+        // Validate and process each task
+        const processedTasks = parsedResponse.tasks.map((task: any) => {
+          // Validate required fields
+          if (!task.taskName || !task.description) {
+            throw new Error('Missing required fields in parsed task');
+          }
 
-          // If the date is in the past, adjust it
-          if (dueDate <= now) {
-            // Check if it's a day of the week mention
-            const dayMatch = input.match(/next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i);
-            if (dayMatch) {
-              parsedTask.dueDate = getNextDayOfWeek(dayMatch[1]).toISOString();
-            } else if (input.toLowerCase().includes('tomorrow')) {
-              const tomorrow = new Date();
-              tomorrow.setDate(tomorrow.getDate() + 1);
-              tomorrow.setHours(23, 59, 0, 0);
-              parsedTask.dueDate = tomorrow.toISOString();
-            } else if (input.toLowerCase().includes('next week')) {
-              const nextWeek = new Date();
-              nextWeek.setDate(nextWeek.getDate() + 7);
-              nextWeek.setHours(23, 59, 0, 0);
-              parsedTask.dueDate = nextWeek.toISOString();
+          // Handle date parsing for each task
+          if (task.dueDate) {
+            const dueDate = new Date(task.dueDate);
+            const now = new Date();
+
+            // If the date is in the past, adjust it
+            if (dueDate <= now) {
+              // Check if it's a day of the week mention
+              const dayMatch = input.match(/next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i);
+              if (dayMatch) {
+                task.dueDate = getNextDayOfWeek(dayMatch[1]).toISOString();
+              } else if (input.toLowerCase().includes('tomorrow')) {
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(23, 59, 0, 0);
+                task.dueDate = tomorrow.toISOString();
+              } else if (input.toLowerCase().includes('next week')) {
+                const nextWeek = new Date();
+                nextWeek.setDate(nextWeek.getDate() + 7);
+                nextWeek.setHours(23, 59, 0, 0);
+                task.dueDate = nextWeek.toISOString();
+              }
             }
           }
-        }
 
-        return parsedTask;
+          return task;
+        });
+
+        return processedTasks;
       } catch (error) {
         console.error('Failed to parse OpenAI response:', content);
-        throw new Error('Failed to parse task from natural language');
+        throw new Error('Failed to parse tasks from natural language');
       }
     });
   }

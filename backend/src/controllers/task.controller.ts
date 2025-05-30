@@ -77,18 +77,22 @@ export class TaskController {
   createFromNaturalLanguage = async (req: Request, res: Response): Promise<void> => {
     try {
       const startTime = Date.now();
-      const parsedTask = await this.openAIService.parseNaturalLanguage(req.body.input);
+      const parsedTasks = await this.openAIService.parseNaturalLanguage(req.body.input);
       
-      const task = new Task({
-        ...parsedTask,
-        originalInput: req.body.input
-      });
+      // Create and save all tasks
+      const savedTasks = await Promise.all(parsedTasks.map(async (parsedTask) => {
+        const task = new Task({
+          ...parsedTask,
+          originalInput: req.body.input
+        });
+        return task.save();
+      }));
 
-      const savedTask = await task.save();
       const processingTime = Date.now() - startTime;
 
-      res.status(201).json(createResponse(true, savedTask, null, {
-        timing: processingTime
+      res.status(201).json(createResponse(true, savedTasks, null, {
+        timing: processingTime,
+        tasksCreated: savedTasks.length
       }));
     } catch (error) {
       throw error;
@@ -99,18 +103,22 @@ export class TaskController {
   createFromTranscript = async (req: Request, res: Response): Promise<void> => {
     try {
       const startTime = Date.now();
-      const parsedTask = await this.openAIService.parseNaturalLanguage(req.body.transcript);
+      const parsedTasks = await this.openAIService.parseNaturalLanguage(req.body.transcript);
       
-      const task = new Task({
-        ...parsedTask,
-        originalInput: req.body.transcript
-      });
+      // Create and save all tasks
+      const savedTasks = await Promise.all(parsedTasks.map(async (parsedTask) => {
+        const task = new Task({
+          ...parsedTask,
+          originalInput: req.body.transcript
+        });
+        return task.save();
+      }));
 
-      const savedTask = await task.save();
       const processingTime = Date.now() - startTime;
 
-      res.status(201).json(createResponse(true, savedTask, null, {
-        timing: processingTime
+      res.status(201).json(createResponse(true, savedTasks, null, {
+        timing: processingTime,
+        tasksCreated: savedTasks.length
       }));
     } catch (error) {
       throw error;
@@ -140,16 +148,17 @@ export class TaskController {
           req.file.originalname
         );
 
-        // Log the transcript for debugging
-
-        const parsedTask = await this.openAIService.parseNaturalLanguage(transcript);
+        const parsedTasks = await this.openAIService.parseNaturalLanguage(transcript);
         
-        const task = new Task({
-          ...parsedTask,
-          originalInput: transcript
-        });
+        // Create and save all tasks
+        const savedTasks = await Promise.all(parsedTasks.map(async (parsedTask) => {
+          const task = new Task({
+            ...parsedTask,
+            originalInput: transcript
+          });
+          return task.save();
+        }));
 
-        const savedTask = await task.save();
         const processingTime = Date.now() - startTime;
 
         // Clean up the uploaded file
@@ -159,9 +168,10 @@ export class TaskController {
           console.error('Error cleaning up file:', cleanupError);
         }
 
-        res.status(201).json(createResponse(true, savedTask, null, {
+        res.status(201).json(createResponse(true, savedTasks, null, {
           timing: processingTime,
-          transcript: transcript // Include transcript in response for debugging
+          tasksCreated: savedTasks.length,
+          transcript: transcript
         }));
       } catch (error) {
         // Clean up the uploaded file in case of error
