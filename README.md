@@ -21,6 +21,13 @@ A modern task management application that uses natural language processing and s
   - Filter and sort capabilities
   - Pagination support
 
+## 🌟 ScreenShots
+<img width="964" alt="Screenshot 2025-05-31 at 1 56 48 AM" src="https://github.com/user-attachments/assets/56c9f955-2e62-40b1-8cb9-f251630cf2cf" />
+<img width="820" alt="Screenshot 2025-05-31 at 1 57 02 AM" src="https://github.com/user-attachments/assets/7622969c-5f21-495f-b432-92d6cba54d34" />
+<img width="1073" alt="Screenshot 2025-05-31 at 1 57 30 AM" src="https://github.com/user-attachments/assets/0b26e282-9375-41c4-9feb-e527de1cec9c" />
+<img width="1094" alt="Screenshot 2025-05-31 at 1 58 41 AM" src="https://github.com/user-attachments/assets/3d9c8d7d-4c5b-45a6-9c8a-23bc5fe8f7a1" />
+
+
 ## 🛠 Tech Stack
 
 ### Frontend
